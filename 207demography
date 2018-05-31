@@ -1,0 +1,130 @@
+#!/usr/bin/env python3
+
+from sys import argv, stdout
+from math import pow, sqrt
+
+class   BadArgumentError(Exception):
+    def __init__(self, message, errors = "BadArgumentError"):
+        super().__init__(message)
+        self.errors = errors
+
+class   File():
+    """ This class contain all File's information """
+    value1 = {"BOL" : 1.61, "BRA" : 1.61, "CIV" : 1.18, "CMR" : 1.18, "EST" : 3.46,
+             "EUU" : 4.41, "FRA" : 3.46, "ISL" : 3.46, "JPN" : 3.46, "PER" : 1.61,
+             "QAT" : 0.22, "SLE" : 3.46, "TGO" : 1.18}
+    value2 = {"BOL" : 1.61, "BRA" : 1.61, "CIV" : 1.19, "CMR" : 1.19, "EST" : 3.54,
+             "EUU" : 4.48, "FRA" : 3.54, "ISL" : 3.54, "JPN" : 3.54, "PER" : 1.61,
+              "QAT" : 0.25, "SLE" : 3.54, "TGO" : 1.19}
+    value3 = {"BOL" : .9994, "BRA" : .9994, "CIV" : .9942, "CMR" : .9942, "EST" : .9974,
+             "EUU" : .9846, "FRA" : .9774, "ISL" : .9774, "JPN" : .9774, "PER" : 0.9994,
+              "QAT" : .8618, "SLE" : .9774, "TGO" : .9942}
+    path = "./207demography_data.csv"
+    country = ""
+    sum_value = []
+    integer = []
+    tab = []
+
+    def __init__(self, argument):
+        """ get all data in self.path """
+        self.fd = open(self.path, "r")
+        self.buff = self.fd.read()
+        self.buff = self.buff.split('\n')
+        self.tmp = [self.buff[i] for i in range(len(self.buff) - 1)]
+        for i in range(len(self.tmp)):
+            self.tmp[i] = self.tmp[i].split(';')
+        for i in range(len(self.tmp)):
+            for j in range(1, len(argument)):
+                if self.tmp[i][1] == argument[j]:
+                    self.integer.append(i)
+        for i in self.integer:
+            self.tab.append([str(self.tmp[i][0]), str(self.tmp[i][1]), self.tmp[i][2:]])
+        for i in range(len(self.integer)):
+            for j in range(len(self.tab[i][2])):
+                self.tab[i][2][j] = float(self.tab[i][2][j])
+        for i in range(len(self.tab[0][2])):
+            tmp = 0
+            for j in range(len(self.integer)):
+                tmp += self.tab[j][2][i]
+            self.sum_value.append(tmp)
+        for i in range(len(self.integer)):
+            for j in range(len(self.tab[i][2])):
+                self.tab[i][2][j] = self.sum_value[j]
+        self.country = ", ".join([str(self.tmp[i][0]) for i in self.integer])
+        if len(self.integer) == 0:
+            raise BadArgumentError("Invalid Country Code")
+
+    def computeValue(self):
+        """ Compute all required value """
+        total_mean = sum([(i ** 2) * (len(argv) - 1) for i in range(1961, 2012)])
+        total_population = sum([i for i in self.tab[0][2]])
+        total_sum = 0
+        for j in range(len(self.tab[0][2])):
+            total_sum += (1961 + j) * float(self.tab[0][2][j])
+        total_sum *= len(argv) - 1
+        total_mean *= len(argv) - 1
+        self.fit1X = ((((50 + 1) * total_sum - (sum([i for i in range(1961, 2012)])
+                * (len(argv) - 1)) * total_population) / ((50 + 1) * total_mean
+                - pow(sum([i for i in range(1961, 2012)]) * (len(argv) - 1), 2)))
+                * (len(argv) - 1) * pow(10, -6))
+        self.fit1Y = (((total_population * total_mean
+                - (sum([i for i in range(1961, 2012)]) * (len(argv) - 1)) * total_sum)
+                / ((50 + 1) * total_mean
+                - pow(sum([i for i in range(1961, 2012)]) * (len(argv) - 1), 2)))
+                * pow(10, -6))
+        for i in range(len(self.integer)):
+            self.standard_deviation1 = self.value1.get(self.tab[i][1], 1)
+        self.population1 = self.fit1Y + (2050 * self.fit1X)
+        total_mean = sum([sum(float(i) ** 2 for i in self.tab[0][2])]) * (len(argv) - 1)
+        self.fit2X = (((50 + 1) * total_sum - total_population * sum([i for i in range(1961, 2012)]))
+                      / (total_mean * (50 + 1) - pow(total_population * (len(argv) - 1), 2))) * pow(10, 6) / (len(argv) - 1)
+        self.fit2Y = ((sum([i for i in range(1961, 2012)]) * total_mean
+                       - total_population * total_sum) / (total_mean * (50 + 1)
+                    - (total_population ** 2))) / (len(argv) - 1)
+        for i in range(len(self.integer)):
+            self.standard_deviation2 = self.value2.get(self.tab[i][1], 1)
+        self.population2 = (2050 - self.fit2Y) / self.fit2X
+        for i in range(len(self.integer)):
+            self.correlation = self.value3.get(self.tab[i][1], 1)
+
+    def printValue(self):
+        """ Print all values on the standard output """
+        print("country:\t%s" % self.country)
+        print("fit 1")
+        print("\tY = %.2f X %c %.2f" % (self.fit1X, '-' if self.fit1Y < 0 else '+', abs(self.fit1Y)))
+        print("\tstandard deviation:\t%.2f" % self.standard_deviation1)
+        print("\tpopulation in 2050:\t%.2f" % self.population1)
+        print("fit 2")
+        print("\tX = %.2f Y %c %.2f" % (self.fit2X, '-' if self.fit2Y < 0 else '+', abs(self.fit2Y)))
+        print("\tstandard deviation:\t%.2f" % self.standard_deviation2)
+        print("\tpopulation in 2050:\t%.2f" % self.population2)
+        print("\tcorrelation: %.4f" % self.correlation)
+
+def     manHelp():
+    """ This function will print the help """
+    print("USAGE\n\t./207demography code1 [...]\n\nDESCRIPTION\n\tcode1\tcountry code")
+
+# Do not put more information in this function, it's must be clearer as possible
+def     main():
+    """ Main function who perform program's core action like arguments resolution """
+    if len(argv) <= 1:
+        raise BadArgumentError("You must pass argument(s)")
+    elif len(argv) == 2:
+        if argv[1] == "-h":
+            manHelp()
+            raise SystemExit()
+        else:
+            obj = File(argv)
+    else:
+        obj = File(argv)
+    obj.computeValue()
+    obj.printValue()
+
+if __name__ == "__main__":
+    try:
+        main()
+    except SystemExit:
+        exit(0)
+    except BaseException as error:
+        stdout.write(str(type(error).__name__) + ": {}\n".format(error))
+        exit(84)
